@@ -5,7 +5,7 @@ import argparse
 import sys
 import os
 import json
-from G2PSelection import BatchActiveSubset, SeqBatchActiveSubset, RandomSubset
+from G2PSelection import BatchActiveSubset, RandomSubset
 from SubmodularObjective import FeatureObjective, CrossEntropyObjective, \
                                 DecayingCrossEntropyObjective, \
                                 FeatureCoverageObjective, TanhFeatureCoverageObjective, \
@@ -19,21 +19,17 @@ def parse_input():
     parser.add_argument("wordlist", help="path with a list of words")
     parser.add_argument("budget", help="The total budget allocated for words",
                         type=float)
-    parser.add_argument("--max-size", help="The maximum number of test words "
-                        "to process", type=int, default=1000000, action="store")
     parser.add_argument("--n-order", help="The maximum order n-gram to use in "
                         "calculating features", type=int, default=2,
                         action="store")
     parser.add_argument("--constraint", help="The type of constraint used "
                         "to limit the number of words selected.",
-                        choices=['card', 'len', 'rootlen', 'freq', 'loglen'],
-                        default='card', action="store")
-    parser.add_argument("--rootlen", help="Inverse of power of length", type=int,
-                        default=5, action="store")
+                        choices=['card', 'sentence_length'],
+                        default='len', action="store")
     parser.add_argument("--root", help="Inverse power of root", type=float,
                         default=2, action="store")
     parser.add_argument("--subset-method", help="The method used to subset the "
-                        "data.", choices=['BatchActive', 'Random', 'SeqBatchActive'],
+                        "data.", choices=['BatchActive', 'Random'],
                         default='BatchActive', action="store")
     parser.add_argument("--vectorizer", help="The type of vectorizer for "
                         "feature computation", choices=['tfidf', 'count'],
@@ -62,11 +58,8 @@ def main():
     # -------------------------------------
     # Nested cost functions
     # -------------------------------------
-    def rootlen(w):
-        return len(w) ** (1.0 / args.rootlen)
-    
-    def loglen(w):
-        return np.log(len(w)+1.0)
+    def sentence_length(w):
+        return len(w.split())
    
     def card(w):
         return 1.0
@@ -77,37 +70,10 @@ def main():
     words = []
     freqs = {}
     # I might be passing in a wordlist file with counts
-    if args.constraint == "freq":
-        total_count = 0.0
-        try:
-            with codecs.open(args.wordlist, "r", encoding="utf-8") as f:
-                for l in f:
-                    if l.strip():
-                        word, count = l.strip().split('\t', 1)
-                        words.append(word)
-                        freqs[word] = float(count)
-                        total_count += float(count)
-        except IndexError:
-            print("Poorly formatted wordlist file. When using the "
-                  "--constraint-type freq option words and their counts "
-                  "from some corpus listed in two tab separated columns.",
-                  file=sys.stderr)
-       
-        for w, c in freqs.iteritems():
-            freqs[w] = -np.log2(c / total_count + sys.float_info.epsilon)        
-         
-    else:
-        with codecs.open(args.wordlist, "r", encoding="utf-8") as f:
-            for l in f:
-                if l.strip():
-                    words.append(l.strip())
-    
-
-    def freq(w):
-        try:
-            return freqs[w]
-        except KeyError:
-            return 1.0
+    with codecs.open(args.wordlist, "r", encoding="utf-8") as f:
+        for l in f:
+            if l.strip():
+                words.append(l.strip())
            
             
     def log_1plusx(x):
@@ -115,13 +81,8 @@ def main():
 
     def root(x):
         return np.power(x, (1./args.root))
-    
-    if len(words) > args.max_size:
-        words = [words[i] for i in np.random.randint(len(words), size=(args.max_size,))]
         
-    
-    cost_functions = {'card': card, 'rootlen': rootlen, 'len': len,
-                      'freq': freq, 'loglen': loglen}
+    cost_functions = {'card': card, 'sentence_length': sentence_length}
     methods = {'BatchActive': BatchActiveSubset, 'Random': RandomSubset,
                'SeqBatchActive': SeqBatchActiveSubset}
     # -------------------------------------
@@ -139,7 +100,8 @@ def main():
     fobj = objectives[args.objective](words, n_order=args.n_order,
                                       g=root, vectorizer=args.vectorizer,
                                       append_ngrams=args.append_ngrams,
-                                      binarize_counts=args.binarize_counts) 
+                                      binarize_counts=args.binarize_counts,
+                                      analyzer='word') 
     
     print("----------------------------------")
     print("Budget: ", args.budget)
@@ -152,6 +114,7 @@ def main():
     print("Append: ", args.append_ngrams)
     print("Cost Select: ", args.cost_select)
     print("Binarize Counts: ", args.binarize_counts)
+    print("Analyzer: word")
     print("----------------------------------")
 
     bas = methods[args.subset_method](
