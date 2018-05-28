@@ -83,8 +83,7 @@ def main():
         return np.power(x, (1./args.root))
         
     cost_functions = {'card': card, 'sentence_length': sentence_length}
-    methods = {'BatchActive': BatchActiveSubset, 'Random': RandomSubset,
-               'SeqBatchActive': SeqBatchActiveSubset}
+    methods = {'BatchActive': BatchActiveSubset, 'Random': RandomSubset}
     # -------------------------------------
     # Create the g2p selection "learners"
     # -------------------------------------

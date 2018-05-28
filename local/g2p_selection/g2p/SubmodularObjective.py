@@ -21,14 +21,14 @@ class FeatureObjective(object):
         
         vectorize_methods = {'tfidf': TfidfVectorizer, 'count': CountVectorizer}
         self.vectorizer = vectorize_methods[vectorizer]
-        
+        self.analyzer = analyzer
+ 
         self.word_features = None
         self.subset = None
         self.p = None
         
         self.get_tfidf_vectorizers()
         self.get_word_features()
-        self.analyzer = analyzer
     
     
     def get_tfidf_vectorizers(self):
@@ -172,8 +172,10 @@ class FeatureCoverageObjective(FeatureObjective):
         vec = self.subset + self.word_features[idx_new, :]
         p_vec = np.squeeze(np.asarray(self.total_counts))
         vec = np.squeeze(np.asarray(vec))
-        return self.K - np.multiply(p_vec, (1.0 / (8.0 ** vec))).sum()
-
+        try:
+            return self.K - np.multiply(p_vec, (1.0 / (8.0 ** vec))).sum()
+        except:
+            pdb.set_trace()
     
 class TanhFeatureCoverageObjective(FeatureObjective):
     def __init__(self, *args, **kwargs):
